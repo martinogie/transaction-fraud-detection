@@ -1,0 +1,77 @@
+{
+  "meta": {
+    "transactions": 1212492,
+    "accounts": 39857,
+    "fraud_rate": 0.0019521778288021695,
+    "train_transactions": 807528,
+    "train_fraud_labels_known": 1011,
+    "train_fraud_actual": 1545,
+    "test_transactions": 324037,
+    "test_fraud": 637,
+    "test_fraud_usd": 416079.12,
+    "alert_budget": 0.005,
+    "review_cost_usd": 4.0,
+    "feature_seconds_1_2m": 2.7,
+    "featurise_and_score_seconds_1_2m": 20.5
+  },
+  "at_budget": {
+    "Rules engine": {
+      "alerts": 1620,
+      "precision": 0.1580246913580247,
+      "recall": 0.40188383045525905,
+      "fraud_usd_caught": 237457.34,
+      "usd_recall": 0.5707023702607331,
+      "net_savings_usd": 230977.34,
+      "pr_auc": 0.12461608166955467
+    },
+    "Isolation Forest": {
+      "alerts": 1620,
+      "precision": 0.23950617283950618,
+      "recall": 0.609105180533752,
+      "fraud_usd_caught": 316011.76999999996,
+      "usd_recall": 0.7594992269739466,
+      "net_savings_usd": 309531.76999999996,
+      "pr_auc": 0.24372168545334433
+    },
+    "Supervised GBM": {
+      "alerts": 1620,
+      "precision": 0.3617283950617284,
+      "recall": 0.9199372056514914,
+      "fraud_usd_caught": 394301.32999999996,
+      "usd_recall": 0.9476594980300861,
+      "net_savings_usd": 387821.32999999996,
+      "pr_auc": 0.5851225280423744
+    },
+    "Hybrid": {
+      "alerts": 1620,
+      "precision": 0.3549382716049383,
+      "recall": 0.902668759811617,
+      "fraud_usd_caught": 402921.66000000003,
+      "usd_recall": 0.968377504739964,
+      "net_savings_usd": 396441.66000000003,
+      "pr_auc": 0.5400140262518892
+    }
+  },
+  "recall_by_pattern": {
+    "Rules engine": {
+      "account_takeover": 0.5475113122171946,
+      "card_testing": 0.2206896551724138,
+      "mule_cashout": 0.5634920634920635
+    },
+    "Isolation Forest": {
+      "account_takeover": 0.5113122171945701,
+      "card_testing": 0.6275862068965518,
+      "mule_cashout": 0.7380952380952381
+    },
+    "Supervised GBM": {
+      "account_takeover": 0.8687782805429864,
+      "card_testing": 0.9482758620689655,
+      "mule_cashout": 0.9444444444444444
+    },
+    "Hybrid": {
+      "account_takeover": 0.8461538461538461,
+      "card_testing": 0.9172413793103448,
+      "mule_cashout": 0.9682539682539683
+    }
+  }
+}

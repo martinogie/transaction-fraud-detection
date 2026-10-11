@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fraud Alert Budget Explorer</title>
+<meta name="description" content="Compare a rules engine, Isolation Forest, gradient boosting and a hybrid on 1.2M synthetic transactions.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=Public+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: an analyst's console — budget control on top, live comparison table, curve chart, notes. */
+:root{--bg:#F6F5F3;--paper:#FFFFFF;--ink:#1C1B1A;--muted:#625E59;--line:#DDD9D3;--accent:#B4372E;
+  --c-rules:#8C96A1;--c-iso:#B07A1E;--c-sup:#3F6E9E;--c-hyb:#B4372E;
+  --display:"Archivo","Arial Narrow",system-ui,sans-serif;--body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141312;--paper:#1C1B19;--ink:#ECE8E3;--muted:#A39D96;--line:#33302C;--accent:#E8705F;--c-rules:#9AA5B1;--c-iso:#E0A84A;--c-sup:#7FAEDC;--c-hyb:#E8705F;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#141312;--paper:#1C1B19;--ink:#ECE8E3;--muted:#A39D96;--line:#33302C;--accent:#E8705F;--c-rules:#9AA5B1;--c-iso:#E0A84A;--c-sup:#7FAEDC;--c-hyb:#E8705F;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 var(--body)}
+.wrap{max-width:920px;margin:0 auto;padding-inline:20px;padding-block:36px 56px}
+.eyebrow{font:12px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+h1{font:800 clamp(30px,5vw,44px)/1.05 var(--display);margin:6px 0 10px;text-wrap:balance}
+h2{font:600 20px var(--display);margin:0 0 8px}
+p{max-width:70ch;margin:0 0 12px}
+.lede{color:var(--muted)}
+.links{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0 26px}
+.links a{font:500 14px var(--body);color:var(--ink);text-decoration:none;border:1px solid var(--line);background:var(--paper);padding:8px 14px;border-radius:999px}
+.links a:hover,.links a:focus-visible{border-color:var(--accent);outline:none}
+.console{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:20px}
+.control{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 16px;align-items:center}
+.control label{font-weight:600}
+.control output{font:500 22px var(--mono);font-variant-numeric:tabular-nums}
+.control input{grid-column:1/-1;width:100%;accent-color:var(--accent)}
+.control .hint{grid-column:1/-1;font:12px var(--mono);color:var(--muted)}
+.tablewrap{overflow-x:auto;margin-top:16px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:right;padding:9px 8px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font:600 12px var(--mono);text-transform:uppercase;color:var(--muted)} td{font-family:var(--mono)}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:8px;vertical-align:middle}
+.best{font-weight:700}
+.bar{display:inline-block;height:8px;border-radius:4px;background:currentColor;opacity:.85;vertical-align:middle;margin-left:8px}
+svg{width:100%;height:auto;display:block;margin-top:14px}
+svg .grid{stroke:var(--line)} svg .tick{fill:var(--muted);font:11px var(--mono)} svg .marker{stroke:var(--ink);stroke-dasharray:3 3}
+section{border-top:1px solid var(--line);padding-top:22px;margin-top:28px}
+ul{padding-left:20px;margin:0;max-width:70ch} li{margin-bottom:6px}
+.note{font-size:14px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Fraud operations · alert budget</div>
+  <h1>Fraud Alert Budget Explorer</h1>
+  <p class="lede">A fraud team can only review so many transactions a day. Pick a review budget and see how much fraud each detector would catch in a test week of 324,037 transactions containing 637 frauds worth $416,079.</p>
+  <div class="links"><a href="https://github.com/martinogie/transaction-fraud-detection">Source code on GitHub</a><a href="https://martinogie.github.io/credit-risk-scoring/">Loan Scorecard Studio</a><a href="https://martinogie.github.io/merchant-churn-prediction/">Merchant Churn Study</a></div>
+
+  <div class="console">
+    <div class="control">
+      <label for="budget">Share of transactions reviewed</label>
+      <output id="budget-out" for="budget">0.50%</output>
+      <input type="range" id="budget" min="0" max="34" step="1" value="9" aria-describedby="budget-hint">
+      <div class="hint" id="budget-hint"></div>
+    </div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Detector</th><th>Fraud $ caught</th><th>Frauds caught</th><th>Precision</th><th>Net savings</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+    <svg id="chart" viewBox="0 0 640 260" role="img" aria-label="Share of fraud dollars caught by each detector as the review budget grows"></svg>
+  </div>
+
+  <section>
+    <h2>What the comparison shows</h2>
+    <ul>
+      <li><b>Rules miss most card testing.</b> A fixed threshold can't tell fraudsters' micro-charges from commuters' transit taps.</li>
+      <li><b>Isolation Forest needs no labels</b> and beats the rules, a sensible first line when confirmed fraud is scarce.</li>
+      <li><b>Supervised gradient boosting ranks best</b> even though only 1,011 of 1,545 training frauds were confirmed by the training cutoff (chargebacks arrive late).</li>
+      <li><b>The hybrid catches the most dollars.</b> It adds the rule hits and anomaly score, and its training weights each fraud by amount, so the queue puts money at risk first.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>How it was tested</h2>
+    <p>Train on days 1–20, skip two days, test on days 23–30. Features look only at an account's past: transaction counts in the last 10 minutes, hour and 24 hours, spend against its own history, new devices, foreign IPs and bursts of small charges. Net savings subtract $4 of analyst time per reviewed alert.</p>
+    <p class="note">All data is synthetic: three fraud patterns (account takeover, card testing, mule cash-out) plus legitimate behaviour that looks suspicious. Featurising and scoring the full 1.2M-transaction month takes about 20 seconds on a laptop. Built with AI-assisted coding (Claude); modeling choices, validation and review by Martins Ogiekpolor.</p>
+  </section>
+</div>
+<script>
+const C = {"Rules engine": {"budget": [0.0005, 0.001, 0.0015, 0.002, 0.0025, 0.003, 0.0035, 0.004, 0.0045, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.011, 0.012, 0.013, 0.014, 0.015, 0.016, 0.017, 0.018, 0.019, 0.02, 0.021, 0.022, 0.023, 0.024, 0.025, 0.026, 0.027, 0.028, 0.029, 0.03], "recall": [0.0832, 0.1491, 0.1947, 0.2355, 0.2653, 0.3014, 0.3108, 0.3281, 0.3469, 0.4019, 0.46, 0.4741, 0.4788, 0.4867, 0.4882, 0.4898, 0.4929, 0.4961, 0.5024, 0.5071, 0.5071, 0.5102, 0.5118, 0.5181, 0.5228, 0.5243, 0.5259, 0.529, 0.529, 0.5322, 0.5385, 0.5385, 0.5385, 0.54, 0.5416], "usd_recall": [0.2432, 0.4076, 0.4601, 0.5088, 0.536, 0.5684, 0.5702, 0.5703, 0.5704, 0.5707, 0.7065, 0.7483, 0.7526, 0.7748, 0.7828, 0.7836, 0.7887, 0.7958, 0.8033, 0.8199, 0.8199, 0.8214, 0.8248, 0.8293, 0.8311, 0.8319, 0.8327, 0.8414, 0.8414, 0.846, 0.8584, 0.8584, 0.8584, 0.8666, 0.8673], "precision": [0.3272, 0.2932, 0.2551, 0.2315, 0.2086, 0.1975, 0.1746, 0.1613, 0.1516, 0.158, 0.1507, 0.1332, 0.1177, 0.1063, 0.096, 0.0875, 0.0808, 0.075, 0.0705, 0.0664, 0.0623, 0.059, 0.0559, 0.0536, 0.0514, 0.0491, 0.047, 0.0452, 0.0433, 0.0418, 0.0407, 0.0392, 0.0378, 0.0366, 0.0355], "net_savings_usd": [100524.11, 168310.59, 189489.85, 209099.94, 219794.98, 232631.9, 232699.11, 232104.83, 231506.8, 230977.34, 286166.26, 302265.33, 302762.62, 310716.44, 312748.83, 311763.75, 312608.5, 314280.7, 316093.88, 321691.13, 320395.13, 319721.61, 319844.28, 320440.3, 319873.71, 318903.56, 317961.32, 320291.81, 318995.81, 319613.68, 323453.91, 322157.91, 320861.91, 322981.43, 321980.08]}, "Isolation Forest": {"budget": [0.0005, 0.001, 0.0015, 0.002, 0.0025, 0.003, 0.0035, 0.004, 0.0045, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.011, 0.012, 0.013, 0.014, 0.015, 0.016, 0.017, 0.018, 0.019, 0.02, 0.021, 0.022, 0.023, 0.024, 0.025, 0.026, 0.027, 0.028, 0.029, 0.03], "recall": [0.0816, 0.1695, 0.2292, 0.2873, 0.3673, 0.4254, 0.4851, 0.5275, 0.573, 0.6091, 0.6625, 0.7002, 0.7347, 0.7598, 0.7786, 0.8069, 0.8195, 0.8352, 0.8414, 0.8477, 0.8556, 0.865, 0.8681, 0.8807, 0.8885, 0.8932, 0.8995, 0.9027, 0.9074, 0.9184, 0.9199, 0.9199, 0.9215, 0.9215, 0.9215], "usd_recall": [0.1152, 0.2582, 0.341, 0.4287, 0.5133, 0.5924, 0.6622, 0.6991, 0.7271, 0.7595, 0.8055, 0.8198, 0.8485, 0.8663, 0.8737, 0.8913, 0.9021, 0.911, 0.92, 0.9377, 0.939, 0.9454, 0.9462, 0.9555, 0.9663, 0.9692, 0.9701, 0.9711, 0.9715, 0.9792, 0.9794, 0.9794, 0.9798, 0.9798, 0.9798], "precision": [0.321, 0.3333, 0.3004, 0.2824, 0.2889, 0.2788, 0.2725, 0.2593, 0.2503, 0.2395, 0.2171, 0.1966, 0.1806, 0.166, 0.1531, 0.1442, 0.1343, 0.1263, 0.1181, 0.1111, 0.1051, 0.1, 0.0948, 0.0911, 0.0873, 0.0836, 0.0804, 0.0772, 0.0743, 0.0722, 0.0696, 0.067, 0.0647, 0.0625, 0.0604], "net_savings_usd": [47275.48, 106148.0, 139933.94, 175763.86, 210325.37, 242616.21, 270993.41, 285714.69, 296681.52, 309531.77, 327359.23, 332040.59, 342692.76, 348777.45, 350586.5, 356575.81, 359777.45, 362200.64, 364641.59, 370718.67, 369946.19, 371325.19, 370348.87, 372924.65, 376123.85, 376043.14, 375108.63, 374230.37, 373128.61, 375016.42, 373787.35, 372491.35, 371394.9, 370098.9, 368802.9]}, "Supervised GBM": {"budget": [0.0005, 0.001, 0.0015, 0.002, 0.0025, 0.003, 0.0035, 0.004, 0.0045, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.011, 0.012, 0.013, 0.014, 0.015, 0.016, 0.017, 0.018, 0.019, 0.02, 0.021, 0.022, 0.023, 0.024, 0.025, 0.026, 0.027, 0.028, 0.029, 0.03], "recall": [0.1507, 0.3281, 0.5118, 0.6625, 0.7457, 0.8038, 0.8493, 0.8791, 0.898, 0.9199, 0.9341, 0.9466, 0.9513, 0.9545, 0.9576, 0.9608, 0.9608, 0.967, 0.9749, 0.9749, 0.9765, 0.978, 0.978, 0.978, 0.978, 0.9796, 0.9843, 0.9843, 0.9843, 0.9843, 0.9843, 0.9843, 0.9874, 0.9906, 0.9906], "usd_recall": [0.5651, 0.7108, 0.7614, 0.7924, 0.8316, 0.8784, 0.9096, 0.9188, 0.9306, 0.9477, 0.9563, 0.966, 0.9812, 0.9833, 0.9835, 0.9903, 0.9903, 0.9914, 0.9942, 0.9942, 0.9947, 0.9948, 0.9948, 0.9948, 0.9948, 0.9948, 0.9979, 0.9979, 0.9979, 0.9979, 0.9979, 0.9979, 0.9987, 0.9991, 0.9991], "precision": [0.5926, 0.6451, 0.6708, 0.6512, 0.5864, 0.5267, 0.4771, 0.4321, 0.3923, 0.3617, 0.3061, 0.2659, 0.2338, 0.2085, 0.1883, 0.1717, 0.1574, 0.1462, 0.1369, 0.1278, 0.12, 0.1131, 0.1068, 0.1012, 0.0961, 0.0917, 0.088, 0.0841, 0.0806, 0.0774, 0.0744, 0.0717, 0.0693, 0.0671, 0.0649], "net_savings_usd": [234476.96, 294467.3, 314866.83, 327120.89, 342784.48, 361585.72, 373912.19, 377109.06, 381371.15, 387821.33, 390125.16, 392855.93, 397892.77, 397465.21, 396250.67, 397794.5, 396498.5, 395633.84, 395536.48, 394240.48, 393118.22, 391895.2, 390599.2, 389303.2, 388007.2, 386715.48, 386697.33, 385401.33, 384105.33, 382809.33, 381513.33, 380217.33, 379240.85, 378131.06, 376835.06]}, "Hybrid": {"budget": [0.0005, 0.001, 0.0015, 0.002, 0.0025, 0.003, 0.0035, 0.004, 0.0045, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.011, 0.012, 0.013, 0.014, 0.015, 0.016, 0.017, 0.018, 0.019, 0.02, 0.021, 0.022, 0.023, 0.024, 0.025, 0.026, 0.027, 0.028, 0.029, 0.03], "recall": [0.1523, 0.2779, 0.4725, 0.6295, 0.7268, 0.7959, 0.8289, 0.8603, 0.8901, 0.9027, 0.9231, 0.9341, 0.9451, 0.9482, 0.9545, 0.956, 0.9623, 0.9655, 0.9655, 0.967, 0.9733, 0.9749, 0.9749, 0.978, 0.9812, 0.9812, 0.9827, 0.9843, 0.9859, 0.9859, 0.9859, 0.9874, 0.989, 0.989, 0.9906], "usd_recall": [0.5694, 0.75, 0.7722, 0.8038, 0.8232, 0.8379, 0.8518, 0.912, 0.9535, 0.9684, 0.9837, 0.9869, 0.9878, 0.9878, 0.9889, 0.9905, 0.991, 0.9934, 0.9934, 0.9942, 0.9952, 0.9952, 0.9952, 0.996, 0.9979, 0.9979, 0.998, 0.998, 0.9981, 0.9981, 0.9981, 0.9981, 0.9983, 0.9983, 0.9987], "precision": [0.5988, 0.5463, 0.6193, 0.6188, 0.5716, 0.5216, 0.4656, 0.4228, 0.3889, 0.3549, 0.3025, 0.2623, 0.2323, 0.2071, 0.1877, 0.1709, 0.1577, 0.146, 0.1356, 0.1267, 0.1196, 0.1127, 0.1065, 0.1012, 0.0964, 0.0918, 0.0878, 0.0841, 0.0808, 0.0775, 0.0745, 0.0719, 0.0694, 0.067, 0.0649], "net_savings_usd": [236278.46, 310763.79, 319354.85, 331863.51, 339281.2, 344730.33, 349868.78, 374270.32, 390878.68, 396441.66, 401525.0, 401536.87, 400625.84, 399337.61, 398517.75, 397869.96, 396775.34, 396498.9, 395198.9, 394206.97, 393344.95, 392056.91, 390760.91, 389790.48, 389274.16, 387978.16, 386724.52, 385436.28, 384177.37, 382881.37, 381585.37, 380293.65, 379060.75, 377764.75, 376650.54]}};
+const NAMES = ["Rules engine","Isolation Forest","Supervised GBM","Hybrid"];
+const COLOR = {"Rules engine":"var(--c-rules)","Isolation Forest":"var(--c-iso)","Supervised GBM":"var(--c-sup)","Hybrid":"var(--c-hyb)"};
+const TEST_TXNS = 324037;
+const B = C["Hybrid"].budget;
+const slider = document.getElementById("budget");
+slider.max = B.length - 1;
+const pct = (v,d=0)=> (v*100).toFixed(d)+"%";
+const usd = v => (v<0?"−$":"$")+Math.abs(Math.round(v)).toLocaleString();
+
+const W=640,H=260,L=46,R=14,T=12,Bt=34, xmax=B[B.length-1];
+const X = b => L + b/xmax*(W-L-R), Y = v => T + (1-v)*(H-T-Bt);
+function drawChart(i){
+  const s=[];
+  [0,.25,.5,.75,1].forEach(v=>s.push(`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" class="grid"/><text x="${L-8}" y="${Y(v)+4}" text-anchor="end" class="tick">${v*100}%</text>`));
+  [0,.01,.02,.03].forEach(b=>s.push(`<text x="${X(b)}" y="${H-12}" text-anchor="middle" class="tick">${(b*100).toFixed(0)}%</text>`));
+  s.push(`<text x="${(L+W-R)/2}" y="${H-1}" text-anchor="middle" class="tick">transactions reviewed</text>`);
+  NAMES.forEach(n=>{
+    const d=C[n].budget.map((b,k)=>(k?"L":"M")+X(b).toFixed(1)+","+Y(C[n].usd_recall[k]).toFixed(1)).join(" ");
+    s.push(`<path d="M${X(0)},${Y(0)} ${d.slice(1).replace(/^/,"L")}" fill="none" stroke="${COLOR[n]}" stroke-width="2.5"/>`);
+  });
+  s.push(`<line x1="${X(B[i])}" x2="${X(B[i])}" y1="${T}" y2="${H-Bt}" class="marker"/>`);
+  NAMES.forEach(n=>s.push(`<circle cx="${X(B[i])}" cy="${Y(C[n].usd_recall[i])}" r="4" fill="${COLOR[n]}"/>`));
+  document.getElementById("chart").innerHTML=s.join("");
+}
+function update(){
+  const i=+slider.value, b=B[i];
+  document.getElementById("budget-out").textContent=pct(b,2);
+  document.getElementById("budget-hint").textContent=`${Math.round(b*TEST_TXNS).toLocaleString()} alerts in the test week, about ${Math.round(b*TEST_TXNS/8).toLocaleString()} a day`;
+  const best=Math.max(...NAMES.map(n=>C[n].usd_recall[i]));
+  document.getElementById("rows").innerHTML=NAMES.map(n=>{
+    const c=C[n], u=c.usd_recall[i];
+    return `<tr><td><span class="sw" style="background:${COLOR[n]}"></span>${n}</td>
+      <td class="${u===best?"best":""}">${pct(u)}<span class="bar" style="width:${Math.round(u*60)}px;color:${COLOR[n]}"></span></td>
+      <td>${pct(c.recall[i])}</td><td>${pct(c.precision[i])}</td><td>${usd(c.net_savings_usd[i])}</td></tr>`;}).join("");
+  drawChart(i);
+}
+slider.addEventListener("input",update);
+update();
+</script>
+</body>
+</html>
