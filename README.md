@@ -68,7 +68,7 @@ mule cash-out) and realistic legitimate look-alikes, so each detector can be che
 
 ## How this was built
 
-Built with AI-assisted coding (Claude). Modeling choices, validation and review are my own.
+Built with AI-assisted coding. Modeling choices, validation and review are my own.
 
 ## License
 
